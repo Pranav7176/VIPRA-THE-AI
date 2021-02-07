@@ -2,43 +2,47 @@ import pyttsx3
 import datetime
 import speech_recognition as sr
 import wikipedia
-import  random
+import random
 import os
 import webbrowser
 
 engine = pyttsx3.init('sapi5')
-voices=engine.getProperty('voices')
+voices = engine.getProperty('voices')
 engine.setProperty('voice', voices[0].id)
-#engine.setProperty('voice', voices[1].id)for female voice
+
+
+# engine.setProperty('voice', voices[1].id)for female voice
 
 # defining speak function
 def speak(audio):
     engine.say(audio)
     engine.runAndWait()
 
+
 # defining wishme function
 def wishMe(username):
-    hour=int(datetime.datetime.now().hour)
+    hour = int(datetime.datetime.now().hour)
 
-    if hour>=0 and hour<=12:
+    if hour >= 0 and hour <= 12:
         speak(f"Good Morning {username}, please tell me how may I help you")
-    elif hour>12 and hour<=18:
+    elif hour > 12 and hour <= 18:
         speak(f"Good Afternoon {username}, please tell me how may I help you")
-    elif hour>18 and hour<=21:
+    elif hour > 18 and hour <= 21:
         speak(f"Good Evening {username}, please tell me how may I help you")
-    elif hour>21 and hour<0:
+    elif hour > 21 and hour < 0:
         speak(f"Good Night {username}, please tell me how may I help you")
+
 
 # defining take command function
 def takeCommand():
-    r=sr.Recognizer()
+    r = sr.Recognizer()
     with sr.Microphone() as source:
         print("Listening.....")
-        r.pause_threshold=1
-        audio=r.listen(source)
+        r.pause_threshold = 1
+        audio = r.listen(source)
         try:
             print("Recognising")
-            query=r.recognize_google(audio, language='eg-in')
+            query = r.recognize_google(audio, language='eg-in')
             query.lower()
             print(f"User said {query}")
         except Exception as e:
@@ -46,27 +50,47 @@ def takeCommand():
             return None
         return query
 
+def change_name(new_name):
+    with open('name.txt', 'w') as na:
+        na.write(new_name)
+        username=new_name
+
+
 if __name__ == '__main__':
     print("do you want  to speak with Sneha or VIPRA")
-    print("Enter 1 for Sneha and 0 for Vipra")
-    ai= int(input("Enter here: "))
+    print("Enter 2 for Sneha and 1 for Vipra")
+    ai = int(input("Enter here: "))
 
-    if ai==0:
-        engine = pyttsx3.init('sapi5')
-        voices = engine.getProperty('voices')
-        engine.setProperty('voice', voices[0].id)
-    elif ai==1:
+
+
+
+
+    if ai == 1:
         engine = pyttsx3.init('sapi5')
         voices = engine.getProperty('voices')
         engine.setProperty('voice', voices[1].id)
+    elif ai == 2:
+        engine = pyttsx3.init('sapi5')
+        voices = engine.getProperty('voices')
+        engine.setProperty('voice', voices[2].id)
     else:
         exit()
 
-
         # defining speak function
 
-    name=input("Whats your name: ")
-    wishMe(name)
+    filesize = os.path.getsize("name.txt")
+    if filesize==0:
+
+        speak('plaese Tell me your name')
+        name_user=str(input("Enter here: "))
+        with open('name.txt', 'w') as n:
+            n.write(name_user)
+        wishMe(name_user)
+
+    else:
+        wname=open('name.txt')
+        wishname=wname.read()
+        wishMe(wishname)
     speak("you can tell exit anywhere to exit VIPRA")
 
     # query=takeCommand()
@@ -75,17 +99,17 @@ if __name__ == '__main__':
             query = takeCommand().lower()
             if 'wikipedia' in query:
                 speak("Searching wikipedia")
-                query=query.replace("wikipedia", "")
+                query = query.replace("wikipedia", "")
                 speak("According to wikipedia")
-                results=wikipedia.summary(query, sentences=2)
+                results = wikipedia.summary(query, sentences=2)
                 print(results)
                 speak(results)
 
             if 'your name' in query:
-                speak(f"My name is Vipra! {name}")
+                speak(f"My name is Vipra")
 
             if 'exit' in query:
-                speak(f"Thank u for using VIPRA or Sneha {name}" )
+                speak(f"Thank u for using VIPRA or Sneha ")
                 exit()
             if "play game" in query:
                 speak("Which game you want to play. Guess the number or tic tac toe or 3 cup Monty")
@@ -109,6 +133,11 @@ if __name__ == '__main__':
                     speak(f"You guessed the number in {guesses} guesses")
                 except Exception as e:
                     speak("Sorry an error occered")
+            if "change my name" in query:
+                speak('okay! what should I call you')
+                name=input("Please Enter here: ")
+                change_name(name)
+                speak(f"okay I will remember that, {name}")
 
             if "game 2" in query:
                 try:
@@ -259,9 +288,10 @@ if __name__ == '__main__':
                         if not replay():
                             break
                 except Exception as e:
-                    if "open youtube" in query:
-                        webbrowser.open('https://www.youtube.com/')
-                        speak("opening youtube")
+                    speak("Error")
+            if "open youtube" in query:
+                webbrowser.open('https://www.youtube.com/')
+                speak("opening youtube")
             if "open google" in query:
                 webbrowser.open('https://www.google.com/')
                 speak("opening google")
@@ -275,41 +305,38 @@ if __name__ == '__main__':
                 webbrowser.open_new_tab("https://web.whatsapp.com/")
                 speak("opening instagram")
 
-
-
             if "open instagram" in query:
                 webbrowser.open_new_tab('https://www.instagram.com/')
                 speak("opening instagram")
 
-            if  "open brave browser" in query:
-                path1=r"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Brave.lnk"
+            if "open brave browser" in query:
+                path1 = r"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Brave.lnk"
                 speak("opening brave browser")
                 os.startfile(path1)
-            if  "open excel" in query:
-                path1=r"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Excel.lnk"
+            if "open excel" in query:
+                path1 = r"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Excel.lnk"
                 speak("opening excel")
                 os.startfile(path1)
-            if  "open powerpoint" in query:
-                path1=r"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\PowerPoint.lnk"
+            if "open powerpoint" in query:
+                path1 = r"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\PowerPoint.lnk"
                 speak("opening powerpoint")
                 os.startfile(path1)
-            if  "open microsoft word" in query:
-                path1=r"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Word.lnk"
+            if "open microsoft word" in query:
+                path1 = r"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Word.lnk"
                 speak("opening word")
                 os.startfile(path1)
             if "open chrome" in query:
                 path1 = r"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Google Chrome.lnk"
                 speak("opening chrome")
                 os.startfile(path1)
-            else:
-                speak("I found these results on google")
-                webbrowser.open('https://www.google.com/?#q=' + query)
+            # facts
 
 
+            if 'my name' in query:
+                a=open('name.txt')
+                s1=a.read()
+                speak(s1)
 
-
-
-                speak("There was an error")
 
             if "game 3" in query:
                 pass
