@@ -1,3 +1,4 @@
+import time
 import pyttsx3
 import datetime
 import speech_recognition as sr
@@ -6,6 +7,8 @@ import random
 import os
 import webbrowser
 import re
+import PyPDF2
+from  tkinter.filedialog import *
 
 engine = pyttsx3.init('sapi5')
 voices = engine.getProperty('voices')
@@ -94,7 +97,7 @@ if __name__ == '__main__':
         wishMe(wishname)
     speak("you can tell exit anywhere to exit VIPRA")
 
-    # query=takeCommand()
+    
     try:
         while True:
             query = takeCommand().lower()
@@ -110,11 +113,12 @@ if __name__ == '__main__':
                 speak(f"My name is Vipra")
 
             if 'exit' in query:
-                speak(f"Thank u for using VIPRA or Sneha ")
+                speak(f"I will be around here, call me when you want")
                 exit()
             if "play game" in query:
                 speak("Which game you want to play. Guess the number or tic tac toe or 3 cup Monty")
-            if "game 1" in query:
+                time.sleep(3)
+            if "guess the number" in query:
                 try:
                     randNumber = random.randint(1, 100)
                     userGuess = None
@@ -138,9 +142,9 @@ if __name__ == '__main__':
                 speak('okay! what should I call you')
                 name=input("Please Enter here: ")
                 change_name(name)
-                speak(f"okay I will remember that, {name}")
+                speak(f"okay I will remember that {name}")
 
-            if "game 2" in query:
+            if "tic-tac-toe" in query:
                 try:
                     from IPython.display import clear_output
 
@@ -293,43 +297,54 @@ if __name__ == '__main__':
             if "open youtube" in query:
                 webbrowser.open('https://www.youtube.com/')
                 speak("opening youtube")
+                time.sleep(3)
             if "open google" in query:
                 webbrowser.open('https://www.google.com/')
                 speak("opening google")
+                time.sleep(3)
             if "open browser" in query:
                 webbrowser.open_new('https://www.google.com/')
                 speak("opening google")
+                time.sleep(3)
             if "open google maps" in query:
                 webbrowser.open_new_tab("https://www.google.co.in/maps/")
                 speak("opening googlemaps")
+                time.sleep(3)
             if "open whatsapp in browser" in query:
                 webbrowser.open_new_tab("https://web.whatsapp.com/")
                 speak("opening instagram")
+                time.sleep(3)
 
             if "open instagram" in query:
                 webbrowser.open_new_tab('https://www.instagram.com/')
                 speak("opening instagram")
+                time.sleep(5)
 
             if "open brave browser" in query:
                 path1 = r"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Brave.lnk"
                 speak("opening brave browser")
                 os.startfile(path1)
+                time.sleep(5)
             if "open excel" in query:
                 path1 = r"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Excel.lnk"
                 speak("opening excel")
                 os.startfile(path1)
+                time.sleep(5)
             if "open powerpoint" in query:
                 path1 = r"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\PowerPoint.lnk"
                 speak("opening powerpoint")
                 os.startfile(path1)
+                time.sleep(5)
             if "open microsoft word" in query:
                 path1 = r"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Word.lnk"
                 speak("opening word")
+                time.sleep(5)
                 os.startfile(path1)
             if "open chrome" in query:
                 path1 = r"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Google Chrome.lnk"
                 speak("opening chrome")
                 os.startfile(path1)
+                time.sleep(5)
             # facts
 
 
@@ -424,6 +439,45 @@ if __name__ == '__main__':
 
                 except Exception as e:
                     speak("sorry There was an error")
+
+            if "bored" in query:
+                speak("You can play games or read books with me")
+                speak("You can also hear some songs")
+                print("To play a game you can say 'play games'")
+                print("To read book you can say 'read me a book'")
+                print("To read listen songs 'play songs'")
+                time.sleep(3)
+                # more will be added in this 'if' section
+
+            if "read me a book" in query:
+                speak("Please wait opening VIPRA PDF AUDIOBOOK.....")
+                time.sleep(4)
+                if __name__ == '__main__':
+                    print("Only text pdf files are supported")
+                    print("Enter the file location of the file")
+                    book = askopenfilename()
+                    pdfreader = PyPDF2.PdfFileReader(book)
+                    pages = pdfreader.numPages
+                    print("Enter the page number You want to hear")
+                    mainPageNumber = int(input("ENTER HERE: "))
+                    if mainPageNumber <= pages:
+                        pass
+                    else:
+                        print("The page number you have entered is greater than the pages in the book")
+                        exit()
+
+                    mainPage = pdfreader.getPage(mainPageNumber)
+
+                    for i in range(mainPageNumber, pages):
+                        text = mainPage.extractText()
+
+                        print(text)
+                        speak(text)
+
+
+            if "songs" in query:
+                speak("opening spotify")
+                webbrowser.open_new_tab('https://open.spotify.com/')
 
             # if "open spotify" in query:
     except Exception as e:
