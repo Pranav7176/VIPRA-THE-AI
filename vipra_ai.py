@@ -15,6 +15,8 @@ engine = pyttsx3.init('sapi5')
 voices = engine.getProperty('voices')
 engine.setProperty('voice', voices[0].id)
 
+
+
 # lists
 
 
@@ -42,21 +44,24 @@ def wishMe(username):
 
 # defining take command function
 def takeCommand():
+    #It takes microphone input from the user and returns string output
+
     r = sr.Recognizer()
     with sr.Microphone() as source:
-        print("Listening.....")
+        print("Listening...")
         r.pause_threshold = 1
         audio = r.listen(source)
-        try:
-            print("Recognising")
-            query = r.recognize_google(audio, language='eg-in')
-            query.lower()
-            print(f"User said {query}")
-        except Exception as e:
-            pass
-            return None
-        query=query.lower()
-        return query
+
+    try:
+        print("Recognizing...")    
+        query = r.recognize_google(audio, language='en-in')
+        print(f"User said: {query}\n")
+
+    except Exception as e:
+        # print(e)    
+        print("Say that again please...")  
+        return "None"
+    return query
 
 
 def change_name(new_name):
@@ -67,27 +72,10 @@ def change_name(new_name):
 
 if __name__ == '__main__':
     while(True):
-        try:
-            permission=takeCommand()
-            if "wake up" in permission:
-                filesize = os.path.getsize("name.txt")
-                if filesize == 0:
-
-                    speak('plaese Tell me your name')
-                    name_user = str(input("Enter here: "))
-                    with open('name.txt', 'w') as n:
-                        n.write(name_user)
-                    wishMe(name_user)
-
-                else:
-                    wname = open('name.txt')
-                    wishname = wname.read()
-                    wishMe(wishname)
-                speak("you can tell exit anywhere to exit VIPRA")
 
                 try:
                     while True:
-                        query = takeCommand()
+                        query = takeCommand().lower()
                         if 'wikipedia' in query:
                             speak("Searching wikipedia")
                             query = query.replace("wikipedia", "")
@@ -134,7 +122,7 @@ if __name__ == '__main__':
                             change_name(name)
                             speak(f"okay I will remember that {name}")
 
-                        if "tic-tac-toe" in query:
+                        if "game 1" in query:
                             try:
                                 from IPython.display import clear_output
 
@@ -311,31 +299,31 @@ if __name__ == '__main__':
                             time.sleep(5)
 
                         if "open brave browser" in query:
-                            path1 = r"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Brave.lnk"
+                            path1 = r"C:\\ProgramData\\Microsoft\Windows\\Start Menu\\Programs\\Brave.lnk"
                             speak("opening brave browser")
                             os.startfile(path1)
                             time.sleep(5)
                         if "open excel" in query:
-                            path1 = r"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Excel.lnk"
+                            path1 = r"C:\\ProgramData\\Microsoft\Windows\\Start Menu\\Programs\\Excel.lnk"
                             speak("opening excel")
                             os.startfile(path1)
                             time.sleep(5)
                         if "open powerpoint" in query:
-                            path1 = r"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\PowerPoint.lnk"
+                            path1 = r"C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\PowerPoint.lnk"
                             speak("opening powerpoint")
                             os.startfile(path1)
                             time.sleep(5)
                         if "open microsoft word" in query:
-                            path1 = r"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Word.lnk"
+                            path1 = r"C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\Word.lnk"
                             speak("opening word")
                             time.sleep(5)
                             os.startfile(path1)
                         if "open chrome" in query:
-                            path1 = r"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Google Chrome.lnk"
+                            path1 = r"C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\Google Chrome.lnk"
                             speak("opening chrome")
                             os.startfile(path1)
                             time.sleep(5)
-                        # facts
+                        # # facts
 
                         if 'my name' in query:
                             a = open('name.txt')
@@ -363,7 +351,7 @@ if __name__ == '__main__':
                                     engine.runAndWait()
 
 
-                                def wishMe():
+                                def wishMee():
                                     hour = int(datetime.datetime.now().hour)
                                     if hour >= 0 and hour < 12:
                                         speak("Good Morning sir")
@@ -386,7 +374,7 @@ if __name__ == '__main__':
 
                                 if __name__ == '__main__':
                                     while True:
-                                        wishMe()
+                                        wishMee()
                                         speak('I am alarm ai sir. Please tell me ur alarm')
 
                                         break
@@ -466,22 +454,16 @@ if __name__ == '__main__':
                             speak("opening spotify")
                             webbrowser.open_new_tab('https://open.spotify.com/')
 
-                        if "open terminal" in query:
-                            path1 = r"C:\Windows\system32\cmd.exe"
-                            speak("opening terminal")
-                            os.startfile(path1)
-                            time.sleep(5)
+                        # if "open terminal" in query:
+                        #     path1 = r"C:\Windows\system32\cmd.exe"
+                        #     speak("opening terminal")
+                        #     os.startfile(path1)
+                        #     time.sleep(5)
 
                         # if "open spotify" in query:
+                        elif "exit" in query:
+                            speak(f"I will be around here, call me when you want")
                 except Exception as e:
                     continue
 
-            elif "exit" in permission:
-                speak(f"I will be around here, call me when you want")
-                sys.exit()
-
-            elif "" in permission:
-                speak("no input from the user please tell wakeup to start the ai")
-                continue
-        except Exception as error:
-            speak("There was an error please tell wake up to start the AI")
+            
