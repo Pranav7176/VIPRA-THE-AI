@@ -72,10 +72,27 @@ def change_name(new_name):
 
 if __name__ == '__main__':
     while(True):
+        filesize = os.path.getsize("name.txt")
+        if filesize==0:
+                            speak("how may I call u")
+                            name=input("Enter here: ")
+                            with open("name.txt", "w") as username:
+                                username.write(name)
+                            wishMe(name)
 
-                try:
+
+        else:
+                            wname = open('name.txt')
+                            wishname = wname.read()
+                            wishMe(wishname)
+                            speak("you can tell exit anywhere to exit VIPRA")
+        try:
                     while True:
                         query = takeCommand().lower()
+
+                        
+                        
+
                         if 'wikipedia' in query:
                             speak("Searching wikipedia")
                             query = query.replace("wikipedia", "")
@@ -284,13 +301,13 @@ if __name__ == '__main__':
                             webbrowser.open_new('https://www.google.com/')
                             speak("opening google")
                             time.sleep(3)
-                        if "open google maps" in query:
+                        if "open maps" in query:
                             webbrowser.open_new_tab("https://www.google.co.in/maps/")
                             speak("opening googlemaps")
                             time.sleep(3)
                         if "open whatsapp in browser" in query:
                             webbrowser.open_new_tab("https://web.whatsapp.com/")
-                            speak("opening instagram")
+                            speak("opening whatsapp web")
                             time.sleep(3)
 
                         if "open instagram" in query:
@@ -463,7 +480,5 @@ if __name__ == '__main__':
                         # if "open spotify" in query:
                         elif "exit" in query:
                             speak(f"I will be around here, call me when you want")
-                except Exception as e:
+        except Exception as e:
                     continue
-
-            
