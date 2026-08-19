@@ -1,484 +1,774 @@
-import sys
-import time
-import pyttsx3
 import datetime
+import os
+import random
+import threading
+import time
+import webbrowser
+from pathlib import Path
+from tkinter import Tk
+from tkinter.filedialog import askopenfilename
+
+import pyttsx3
 import speech_recognition as sr
 import wikipedia
-import random
-import os
-import webbrowser
-import re
-import PyPDF2
-from tkinter.filedialog import *
-
-engine = pyttsx3.init('sapi5')
-voices = engine.getProperty('voices')
-engine.setProperty('voice', voices[0].id)
+from pypdf import PdfReader
 
 
+# CONFIGURATION
 
-# lists
+ASSISTANT_NAME = "VIPRA"
+NAME_FILE = Path("name.txt")
 
 
-# engine.setProperty('voice', voices[1].id)for female voice
+# TEXT TO SPEECH
 
-# defining speak function
-def speak(audio):
-    engine.say(audio)
+engine = pyttsx3.init()
+
+voices = engine.getProperty("voices")
+
+if voices:
+    engine.setProperty("voice", voices[0].id)
+
+engine.setProperty("rate", 175)
+engine.setProperty("volume", 1.0)
+
+
+def speak(text: str) -> None:
+    """Convert text to speech and print it to the terminal."""
+    print(f"{ASSISTANT_NAME}: {text}")
+
+    engine.say(text)
     engine.runAndWait()
 
 
-# defining wishme function
-def wishMe(username):
-    hour = int(datetime.datetime.now().hour)
+# USER NAME
 
-    if hour >= 0 and hour <= 12:
-        speak(f"Good Morning {username}, please tell me how may I help you")
-    elif hour > 12 and hour <= 18:
-        speak(f"Good Afternoon {username}, please tell me how may I help you")
-    elif hour > 18 and hour <= 21:
-        speak(f"Good Evening {username}, please tell me how may I help you")
-    elif hour > 21 and hour < 0:
-        speak(f"Good Night {username}, please tell me how may I help you")
+def get_username() -> str:
+    """Read the user's name from name.txt."""
+    try:
+        if NAME_FILE.exists():
+            name = NAME_FILE.read_text(encoding="utf-8").strip()
+
+            if name:
+                return name
+
+    except OSError:
+        pass
+
+    return ""
 
 
-# defining take command function
-def takeCommand():
-    #It takes microphone input from the user and returns string output
+def save_username(name: str) -> None:
+    """Save the user's name."""
+    NAME_FILE.write_text(name.strip(), encoding="utf-8")
 
-    r = sr.Recognizer()
+
+def change_name() -> None:
+    """Ask the user for a new name and save it."""
+    speak("Okay. What should I call you?")
+
+    name = input("Enter your name: ").strip()
+
+    if not name:
+        speak("That doesn't look like a valid name.")
+        return
+
+    save_username(name)
+    speak(f"Okay, I will remember that, {name}.")
+
+
+
+# GREETING
+
+def wish_me(username: str) -> None:
+    """Give a greeting depending on the current time."""
+    hour = datetime.datetime.now().hour
+
+    if 0 <= hour < 12:
+        greeting = "Good morning"
+    elif 12 <= hour < 18:
+        greeting = "Good afternoon"
+    elif 18 <= hour < 22:
+        greeting = "Good evening"
+    else:
+        greeting = "Good night"
+
+    speak(
+        f"{greeting} {username}, "
+        f"please tell me how may I help you."
+    )
+
+
+# SPEECH RECOGNITION
+
+def take_command() -> str:
+    """Listen through the microphone and return recognized text."""
+    recognizer = sr.Recognizer()
+
     with sr.Microphone() as source:
-        print("Listening...")
-        r.pause_threshold = 1
-        audio = r.listen(source)
+        print("\nListening...")
+
+        recognizer.pause_threshold = 1
+        recognizer.adjust_for_ambient_noise(source, duration=0.5)
+
+        try:
+            audio = recognizer.listen(
+                source,
+                timeout=5,
+                phrase_time_limit=10
+            )
+
+        except sr.WaitTimeoutError:
+            print("No speech detected.")
+            return ""
 
     try:
-        print("Recognizing...")    
-        query = r.recognize_google(audio, language='en-in')
-        print(f"User said: {query}\n")
+        print("Recognizing...")
 
-    except Exception as e:
-        # print(e)    
-        print("Say that again please...")  
-        return "None"
-    return query
+        query = recognizer.recognize_google(
+            audio,
+            language="en-IN"
+        )
 
+        print(f"You said: {query}")
+        return query.lower().strip()
 
-def change_name(new_name):
-    with open('name.txt', 'w') as na:
-        na.write(new_name)
-        username = new_name
+    except sr.UnknownValueError:
+        speak("Sorry, I didn't understand that.")
+        return ""
 
-
-if __name__ == '__main__':
-    while(True):
-        filesize = os.path.getsize("name.txt")
-        if filesize==0:
-                            speak("how may I call u")
-                            name=input("Enter here: ")
-                            with open("name.txt", "w") as username:
-                                username.write(name)
-                            wishMe(name)
+    except sr.RequestError:
+        speak("The speech recognition service is currently unavailable.")
+        return ""
 
 
-        else:
-                            wname = open('name.txt')
-                            wishname = wname.read()
-                            wishMe(wishname)
-                            speak("you can tell exit anywhere to exit VIPRA")
+# WIKIPEDIA
+
+def search_wikipedia(query: str) -> None:
+    """Search Wikipedia and read a short summary."""
+    search_term = query.replace("wikipedia", "").strip()
+
+    if not search_term:
+        speak("What should I search for on Wikipedia?")
+        return
+
+    try:
+        speak("Searching Wikipedia.")
+
+        result = wikipedia.summary(
+            search_term,
+            sentences=2,
+            auto_suggest=True
+        )
+
+        print(f"\n{result}\n")
+        speak(result)
+
+    except wikipedia.exceptions.DisambiguationError as error:
+        options = ", ".join(error.options[:5])
+
+        speak(
+            f"There are multiple results for that topic. "
+            f"Some options are: {options}"
+        )
+
+    except wikipedia.exceptions.PageError:
+        speak("I couldn't find a Wikipedia page for that.")
+
+    except Exception as error:
+        print(f"Wikipedia error: {error}")
+        speak("Sorry, something went wrong while searching Wikipedia.")
+
+
+# NUMBER GUESSING GAME
+
+def guess_the_number() -> None:
+    """Play a number guessing game."""
+    number = random.randint(1, 100)
+    guesses = 0
+
+    speak("I have chosen a number between 1 and 100.")
+
+    while True:
         try:
-                    while True:
-                        query = takeCommand().lower()
-
-                        
-                        
-
-                        if 'wikipedia' in query:
-                            speak("Searching wikipedia")
-                            query = query.replace("wikipedia", "")
-                            speak("According to wikipedia")
-                            results = wikipedia.summary(query, sentences=2)
-                            print(results)
-                            speak(results)
+            guess = int(input("Enter your guess: "))
+            guesses += 1
+
+            if guess == number:
+                speak(
+                    f"Correct! You guessed the number "
+                    f"in {guesses} guesses."
+                )
+                break
+
+            if guess > number:
+                speak("Too high. Try a smaller number.")
+            else:
+                speak("Too low. Try a larger number.")
 
-                        if 'your name' in query:
-                            speak(f"My name is Vipra")
+        except ValueError:
+            speak("Please enter a valid number.")
 
-                        if "go to sleep" in query:
-                            speak(f"ok sir I will go to sleep, wake me up when you need my help")
-                            break
-                        if "exit" in query:
-                            speak("ok sir I will terminate the program")
-                            exit()
-                        if "play game" in query:
-                            speak("Which game you want to play. Guess the number or tic tac toe")
-                            time.sleep(3)
-                        if "guess the number" in query:
-                            try:
-                                randNumber = random.randint(1, 100)
-                                userGuess = None
-                                guesses = 0
 
-                                while (userGuess != randNumber):
-                                    userGuess = int(input("Enter your guess: "))
-                                    guesses += 1
-                                    if (userGuess == randNumber):
-                                        print("You guessed it right!")
-                                    else:
-                                        if (userGuess > randNumber):
-                                            speak("You guessed it wrong! Enter a smaller number")
-                                        else:
-                                            speak("You guessed it wrong! Enter a larger number")
 
-                                speak(f"You guessed the number in {guesses} guesses")
-                            except Exception as e:
-                                speak("Sorry an error occered")
-                        if "change my name" in query:
-                            speak('okay! what should I call you')
-                            name = input("Please Enter here: ")
-                            change_name(name)
-                            speak(f"okay I will remember that {name}")
+# TIC TAC TOE
 
-                        if "game 1" in query:
-                            try:
-                                from IPython.display import clear_output
+def display_board(board: list[str]) -> None:
+    """Display the Tic-Tac-Toe board."""
+    print()
+    print(f" {board[7]} | {board[8]} | {board[9]} ")
+    print("---+---+---")
+    print(f" {board[4]} | {board[5]} | {board[6]} ")
+    print("---+---+---")
+    print(f" {board[1]} | {board[2]} | {board[3]} ")
+    print()
 
 
-                                def display_board(board):
-                                    print(board[7] + '|' + board[8] + '|' + board[9])
-                                    print(board[4] + '|' + board[5] + '|' + board[6])
-                                    print(board[1] + '|' + board[2] + '|' + board[3])
+def choose_marker() -> tuple[str, str]:
+    """Choose X or O for Player 1."""
+    while True:
+        marker = input(
+            "Player 1, choose X or O: "
+        ).strip().upper()
 
+        if marker == "X":
+            return "X", "O"
 
-                                def player_input():
+        if marker == "O":
+            return "O", "X"
 
-                                    marker = ''
+        print("Please choose X or O.")
 
-                                    while not (marker == 'X' or marker == 'O'):
-                                        marker = input('Player 1: Do you want to be X or O? ').upper()
 
-                                    if marker == 'X':
-                                        return ('X', 'O')
-                                    else:
-                                        return ('O', 'X')
+def place_marker(
+    board: list[str],
+    marker: str,
+    position: int
+) -> None:
+    """Place a marker on the board."""
+    board[position] = marker
 
 
-                                def place_marker(board, marker, position):
+def win_check(
+    board: list[str],
+    marker: str
+) -> bool:
+    """Check whether a player has won."""
+    winning_positions = [
+        (1, 2, 3),
+        (4, 5, 6),
+        (7, 8, 9),
+        (1, 4, 7),
+        (2, 5, 8),
+        (3, 6, 9),
+        (1, 5, 9),
+        (3, 5, 7),
+    ]
 
-                                    board[position] = marker
+    return any(
+        all(board[position] == marker for position in combination)
+        for combination in winning_positions
+    )
 
 
-                                def win_check(board, mark):
-                                    return ((board[1] == mark and board[2] == mark and board[3] == mark) or
-                                            (board[4] == mark and board[5] == mark and board[6] == mark) or
-                                            (board[7] == mark and board[8] == mark and board[9] == mark) or
-                                            (board[1] == mark and board[4] == mark and board[7] == mark) or
-                                            (board[2] == mark and board[5] == mark and board[8] == mark) or
-                                            (board[3] == mark and board[6] == mark and board[9] == mark) or
-                                            (board[1] == mark and board[5] == mark and board[9] == mark) or
-                                            (board[3] == mark and board[5] == mark and board[7] == mark))
+def board_full(board: list[str]) -> bool:
+    """Check whether the board is full."""
+    return all(board[position] != " " for position in range(1, 10))
 
 
-                                import random
+def get_position(board: list[str]) -> int:
+    """Get a valid empty position from the player."""
+    while True:
+        try:
+            position = int(
+                input("Choose your position (1-9): ")
+            )
 
+            if position not in range(1, 10):
+                print("Choose a number from 1 to 9.")
+                continue
 
-                                def choose_first():
-                                    if random.randint(0, 1) == 0:
-                                        return 'Player 2'
-                                    else:
-                                        return 'Player 1'
+            if board[position] != " ":
+                print("That position is already occupied.")
+                continue
 
+            return position
 
-                                def space_check(board, position):
+        except ValueError:
+            print("Please enter a number.")
 
-                                    return board[position] == ' '
 
+def tic_tac_toe() -> None:
+    """Run a two-player Tic-Tac-Toe game."""
+    speak("Welcome to Tic-Tac-Toe.")
 
-                                def full_board_check(board):
-                                    for i in range(1, 10):
-                                        if space_check(board, i):
-                                            return False
-                                    return True
+    while True:
+        board = [" "] * 10
 
+        player1, player2 = choose_marker()
 
-                                def player_choice(board):
-                                    position = 0
+        current_player = random.choice(["Player 1", "Player 2"])
 
-                                    while position not in [1, 2, 3, 4, 5, 6, 7, 8, 9]:
-                                        position = int(input('Choose your next position: (1-9) '))
+        print(f"{current_player} will go first.")
 
-                                    return position
+        ready = input(
+            "Are you ready to play? (yes/no): "
+        ).strip().lower()
 
+        if not ready.startswith("y"):
+            speak("Okay, maybe later.")
+            return
 
-                                def replay():
-                                    y = input('Do you want to continue? [Y/N]')
+        game_running = True
 
-                                    y = y.lower()
-                                    if y == 'y':
-                                        return True
-                                    else:
-                                        return False
+        while game_running:
 
+            display_board(board)
 
-                                print('Welcome to Tic Tac Toe!')
+            if current_player == "Player 1":
+                marker = player1
+            else:
+                marker = player2
 
-                                while True:
-                                    # Reset the board
-                                    theBoard = [' '] * 10
-                                    player1_marker, player2_marker = player_input()
-                                    turn = choose_first()
-                                    print(turn + ' will go first.')
+            print(f"{current_player}'s turn.")
 
-                                    play_game = input('Are you ready to play? Enter Yes or No.')
+            position = get_position(board)
 
-                                    if play_game.lower()[0] == 'y':
-                                        game_on = True
-
-                                    else:
-
-                                        game_on = False
-
-                                    while game_on:
-                                        if turn == 'Player 1':
-                                            # Player1's turn.
-
-                                            display_board(theBoard)
-
-                                            position = player_choice(theBoard)
-
-                                            place_marker(theBoard, player1_marker, position)
-
-                                            if win_check(theBoard, player1_marker):
-
-                                                display_board(theBoard)
-                                                print('Player 1 has won!')
-
-                                                game_on = False
-                                            else:
-
-                                                if full_board_check(theBoard):
-
-                                                    display_board(theBoard)
-                                                    print('The game is a draw!')
-                                                    game_on = False
-                                                else:
-                                                    turn = 'Player 2'
-
-                                        else:
-                                            # Player2's turn.
-
-                                            display_board(theBoard)
-                                            position = player_choice(theBoard)
-                                            place_marker(theBoard, player2_marker, position)
-
-                                            if win_check(theBoard, player2_marker):
-
-                                                display_board(theBoard)
-                                                print('Player 2 has won!')
-                                                game_on = False
-                                            else:
-                                                if full_board_check(theBoard):
-
-                                                    display_board(theBoard)
-                                                    print('The game is a draw!')
-                                                    game_on = False
-                                                else:
-                                                    turn = 'Player 1'
-
-                                    if not replay():
-                                        break
-                            except Exception as e:
-                                speak("Error")
-                        if "open youtube" in query:
-                            webbrowser.open('https://www.youtube.com/')
-                            speak("opening youtube")
-                            time.sleep(3)
-                        if "open google" in query:
-                            webbrowser.open('https://www.google.com/')
-                            speak("opening google")
-                            time.sleep(3)
-                        if "open browser" in query:
-                            webbrowser.open_new('https://www.google.com/')
-                            speak("opening google")
-                            time.sleep(3)
-                        if "open maps" in query:
-                            webbrowser.open_new_tab("https://www.google.co.in/maps/")
-                            speak("opening googlemaps")
-                            time.sleep(3)
-                        if "open whatsapp in browser" in query:
-                            webbrowser.open_new_tab("https://web.whatsapp.com/")
-                            speak("opening whatsapp web")
-                            time.sleep(3)
+            place_marker(board, marker, position)
 
-                        if "open instagram" in query:
-                            webbrowser.open_new_tab('https://www.instagram.com/')
-                            speak("opening instagram")
-                            time.sleep(5)
+            if win_check(board, marker):
+                display_board(board)
+                speak(f"{current_player} wins!")
+                game_running = False
 
-                        if "open brave browser" in query:
-                            path1 = r"C:\\ProgramData\\Microsoft\Windows\\Start Menu\\Programs\\Brave.lnk"
-                            speak("opening brave browser")
-                            os.startfile(path1)
-                            time.sleep(5)
-                        if "open excel" in query:
-                            path1 = r"C:\\ProgramData\\Microsoft\Windows\\Start Menu\\Programs\\Excel.lnk"
-                            speak("opening excel")
-                            os.startfile(path1)
-                            time.sleep(5)
-                        if "open powerpoint" in query:
-                            path1 = r"C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\PowerPoint.lnk"
-                            speak("opening powerpoint")
-                            os.startfile(path1)
-                            time.sleep(5)
-                        if "open microsoft word" in query:
-                            path1 = r"C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\Word.lnk"
-                            speak("opening word")
-                            time.sleep(5)
-                            os.startfile(path1)
-                        if "open chrome" in query:
-                            path1 = r"C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\Google Chrome.lnk"
-                            speak("opening chrome")
-                            os.startfile(path1)
-                            time.sleep(5)
-                        # # facts
-
-                        if 'my name' in query:
-                            a = open('name.txt')
-                            s1 = a.read()
-                            speak(s1)
-
-                        if "game 3" in query:
-                            pass
-                        if "set alarm" in query:
-                            try:
-                                import pyttsx3
-                                import datetime
-                                from pygame import mixer
-
-                                # https://klingeltonemp3.info/ding-dong-clock.htm
-
-                                engine = pyttsx3.init('sapi5')
-                                voices = engine.getProperty('voices')
-                                # print(voices[1].id)
-                                engine.setProperty('voice', voices[0].id)
-
-
-                                def speak(audio):
-                                    engine.say(audio)
-                                    engine.runAndWait()
-
-
-                                def wishMee():
-                                    hour = int(datetime.datetime.now().hour)
-                                    if hour >= 0 and hour < 12:
-                                        speak("Good Morning sir")
-
-                                    elif hour >= 12 and hour < 18:
-                                        speak("Good Afternoon sir")
-
-                                    else:
-                                        speak("Good Evening sir")
-
-
-                                def alarm(file, stopper):
-                                    mixer.init()
-                                    mixer.music.load(file)
-                                    mixer.music.play()
-
-                                    if stopper == "stop":
-                                        mixer.music.stop()
-
-
-                                if __name__ == '__main__':
-                                    while True:
-                                        wishMee()
-                                        speak('I am alarm ai sir. Please tell me ur alarm')
-
-                                        break
-
-                                    speak("tell me the year")
-                                    year = int(input("Enter here\n"))
-
-                                    speak("tell me the month")
-                                    month = int(input("Enter here\n"))
-
-                                    speak("tell me the day")
-                                    day = int(input("Enter here\n"))
-
-                                    speak("tell me the hour")
-                                    hour = int(input("Enter here\n"))
-
-                                    speak("tell me the minute")
-                                    minutes = int(input("Enter here\n"))
-
-                                    speak("can u tell me what's your message")
-                                    message = str(input("Enter here\n"))
-
-                                    speak("Remember done is the stopper")
-                                    print("Remember done is the stopper")
-
-                                    speak("thank u sir the alarm will ring when its time")
-                                    while True:
-                                        stopper1 = ""
-                                        if year == datetime.datetime.now().year and month == datetime.datetime.now().month and day == datetime.datetime.now().day and hour == datetime.datetime.now().hour and minutes == datetime.datetime.now().minute:
-                                            speak(f"{message}")
-                                            # speak("please enter 'done' to stop alarm")
-                                            # print("please enter 'done' to stop alarm")
-
-                                            alarm("Ding Dong Clock.mp3", stopper1)
-                                            stopper1 = input("Enter here: ")
-                                            if stopper1 == "done":
-                                                break
-
-                            except Exception as e:
-                                speak("sorry There was an error")
-
-                        if "bored" in query:
-                            speak("You can play games or read books with me")
-                            speak("You can also hear some songs")
-                            print("To play a game you can say 'play games'")
-                            print("To read book you can say 'read me a book'")
-                            print("To read listen songs 'play songs'")
-                            time.sleep(3)
-                            # more will be added in this 'if' section
-
-                        if "read me a book" in query:
-                            speak("Please wait opening VIPRA PDF AUDIOBOOK.....")
-                            time.sleep(4)
-                            if __name__ == '__main__':
-                                print("Only text pdf files are supported")
-                                print("Enter the file location of the file")
-                                book = askopenfilename()
-                                pdfreader = PyPDF2.PdfFileReader(book)
-                                pages = pdfreader.numPages
-                                print("Enter the page number You want to hear")
-                                mainPageNumber = int(input("ENTER HERE: "))
-                                if mainPageNumber <= pages:
-                                    pass
-                                else:
-                                    print("The page number you have entered is greater than the pages in the book")
-                                    exit()
-
-                                mainPage = pdfreader.getPage(mainPageNumber)
-
-                                for i in range(mainPageNumber, pages):
-                                    text = mainPage.extractText()
-
-                                    print(text)
-                                    speak(text)
-
-                        if "songs" in query:
-                            speak("opening spotify")
-                            webbrowser.open_new_tab('https://open.spotify.com/')
-
-                        # if "open terminal" in query:
-                        #     path1 = r"C:\Windows\system32\cmd.exe"
-                        #     speak("opening terminal")
-                        #     os.startfile(path1)
-                        #     time.sleep(5)
-
-                        # if "open spotify" in query:
-                        elif "exit" in query:
-                            speak(f"I will be around here, call me when you want")
-        except Exception as e:
-                    continue
+            elif board_full(board):
+                display_board(board)
+                speak("The game is a draw!")
+                game_running = False
+
+            else:
+                current_player = (
+                    "Player 2"
+                    if current_player == "Player 1"
+                    else "Player 1"
+                )
+
+        replay = input(
+            "Do you want to play again? (y/n): "
+        ).strip().lower()
+
+        if not replay.startswith("y"):
+            break
+
+
+# OPEN WEBSITES
+
+def open_website(url: str, name: str) -> None:
+    """Open a website in the default browser."""
+    speak(f"Opening {name}.")
+    webbrowser.open_new_tab(url)
+
+
+# OPEN WINDOWS APPLICATIONS
+
+def open_windows_app(
+    shortcut_path: str,
+    app_name: str
+) -> None:
+    """
+    Open a Windows application using its shortcut.
+
+    Update the shortcut_path if the application is installed
+    somewhere else on your computer.
+    """
+
+    path = Path(shortcut_path)
+
+    if not path.exists():
+        speak(
+            f"I couldn't find the shortcut for {app_name}. "
+            f"Please update its path in the code."
+        )
+        return
+
+    speak(f"Opening {app_name}.")
+
+    try:
+        os.startfile(path)
+
+    except OSError as error:
+        print(f"Application error: {error}")
+        speak(f"I couldn't open {app_name}.")
+
+
+# PDF READER
+
+def read_pdf() -> None:
+    """Open a PDF and read it aloud."""
+    speak("Opening the PDF reader.")
+
+    try:
+        root = Tk()
+        root.withdraw()
+
+        file_path = askopenfilename(
+            title="Select a PDF",
+            filetypes=[
+                ("PDF files", "*.pdf"),
+                ("All files", "*.*")
+            ]
+        )
+
+        root.destroy()
+
+        if not file_path:
+            speak("No PDF was selected.")
+            return
+
+        reader = PdfReader(file_path)
+
+        total_pages = len(reader.pages)
+
+        print(f"\nPDF: {Path(file_path).name}")
+        print(f"Total pages: {total_pages}")
+
+        page_number = int(
+            input(
+                f"Enter the starting page "
+                f"(1-{total_pages}): "
+            )
+        )
+
+        if not 1 <= page_number <= total_pages:
+            speak("That page number is invalid.")
+            return
+
+        speak("Starting the audiobook.")
+
+        for page_index in range(page_number - 1, total_pages):
+
+            page = reader.pages[page_index]
+
+            text = page.extract_text() or ""
+
+            if not text.strip():
+                continue
+
+            print(
+                f"\n--- Page {page_index + 1} ---\n"
+            )
+
+            print(text)
+
+            speak(text)
+
+    except ValueError:
+        speak("Please enter a valid page number.")
+
+    except Exception as error:
+        print(f"PDF error: {error}")
+        speak("Sorry, I couldn't read that PDF.")
+
+
+# ALARM
+
+def alarm_worker(
+    alarm_time: datetime.datetime,
+    message: str
+) -> None:
+    """Wait until the alarm time without blocking VIPRA."""
+    while datetime.datetime.now() < alarm_time:
+        time.sleep(1)
+
+    speak(message)
+
+    print("\n🔔 ALARM 🔔")
+    print(message)
+
+
+def set_alarm() -> None:
+    """Create an alarm."""
+    speak("Tell me the alarm date and time.")
+
+    try:
+        year = int(input("Year: "))
+        month = int(input("Month: "))
+        day = int(input("Day: "))
+        hour = int(input("Hour (0-23): "))
+        minute = int(input("Minute (0-59): "))
+
+        message = input("Alarm message: ").strip()
+
+        if not message:
+            message = "Your alarm is ringing."
+
+        alarm_time = datetime.datetime(
+            year,
+            month,
+            day,
+            hour,
+            minute
+        )
+
+        if alarm_time <= datetime.datetime.now():
+            speak("That time has already passed.")
+            return
+
+        alarm_thread = threading.Thread(
+            target=alarm_worker,
+            args=(alarm_time, message),
+            daemon=True
+        )
+
+        alarm_thread.start()
+
+        formatted_time = alarm_time.strftime(
+            "%d %B %Y at %I:%M %p"
+        )
+
+        speak(
+            f"Alarm set for {formatted_time}."
+        )
+
+    except ValueError:
+        speak("Invalid date or time.")
+
+
+# COMMAND HANDLER
+
+def handle_command(
+    query: str,
+    username: str
+) -> tuple[bool, str]:
+    """
+    Process a voice command.
+
+    Returns:
+        (continue_running, updated_username)
+    """
+
+    # EXIT
+
+    if query in {"exit", "quit", "shutdown", "terminate"}:
+        speak("Okay, I will terminate the program.")
+        return False, username
+
+    # SLEEP
+
+    if "go to sleep" in query:
+        speak(
+            "Okay, I will go to sleep. "
+            "Wake me up when you need my help."
+        )
+        return False, username
+
+    # NAME
+    
+
+    if "change my name" in query:
+        change_name()
+        username = get_username()
+        return True, username
+
+    if query in {"my name", "what is my name", "what's my name"}:
+        if username:
+            speak(f"Your name is {username}.")
+        else:
+            speak("I don't know your name yet.")
+
+        return True, username
+
+    if "your name" in query:
+        speak(f"My name is {ASSISTANT_NAME}.")
+        return True, username
+
+    # WIKIPEDIA
+
+    if "wikipedia" in query:
+        search_wikipedia(query)
+        return True, username
+
+    # GAMES
+
+    if "guess the number" in query:
+        guess_the_number()
+        return True, username
+
+    if query in {"game 1", "tic tac toe", "play tic tac toe"}:
+        tic_tac_toe()
+        return True, username
+
+    if "play game" in query or "play games" in query:
+        speak(
+            "You can play Guess the Number "
+            "or Tic-Tac-Toe."
+        )
+        return True, username
+
+    # WEBSITES
+
+    if "open youtube" in query:
+        open_website(
+            "https://www.youtube.com/",
+            "YouTube"
+        )
+        return True, username
+
+    if "open google" in query:
+        open_website(
+            "https://www.google.com/",
+            "Google"
+        )
+        return True, username
+
+    if "open maps" in query:
+        open_website(
+            "https://www.google.com/maps/",
+            "Google Maps"
+        )
+        return True, username
+
+    if "open whatsapp" in query:
+        open_website(
+            "https://web.whatsapp.com/",
+            "WhatsApp Web"
+        )
+        return True, username
+
+    if "open instagram" in query:
+        open_website(
+            "https://www.instagram.com/",
+            "Instagram"
+        )
+        return True, username
+
+    if "songs" in query or "open spotify" in query:
+        open_website(
+            "https://open.spotify.com/",
+            "Spotify"
+        )
+        return True, username
+
+    # WINDOWS APPLICATIONS
+
+    if "open brave" in query:
+        open_windows_app(
+            r"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Brave.lnk",
+            "Brave"
+        )
+        return True, username
+
+    if "open chrome" in query:
+        open_windows_app(
+            r"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Google Chrome.lnk",
+            "Google Chrome"
+        )
+        return True, username
+
+    if "open excel" in query:
+        open_windows_app(
+            r"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Excel.lnk",
+            "Microsoft Excel"
+        )
+        return True, username
+
+    if "open powerpoint" in query:
+        open_windows_app(
+            r"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\PowerPoint.lnk",
+            "Microsoft PowerPoint"
+        )
+        return True, username
+
+    if "open word" in query:
+        open_windows_app(
+            r"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Word.lnk",
+            "Microsoft Word"
+        )
+        return True, username
+
+    # ALARM
+
+    if "set alarm" in query:
+        set_alarm()
+        return True, username
+
+    # PDF
+    
+
+    if "read me a book" in query or "read pdf" in query:
+        read_pdf()
+        return True, username
+
+    # BORED
+
+    if "bored" in query:
+        speak(
+            "You can play games, read a book, "
+            "or listen to music with me."
+        )
+        return True, username
+
+    # UNKNOWN COMMAND
+
+    speak(
+        "I don't know how to do that yet."
+    )
+
+    return True, username
+
+
+# MAIN PROGRAM
+
+def main() -> None:
+    """Start VIPRA."""
+    username = get_username()
+
+    if not username:
+        speak("How may I call you?")
+
+        username = input(
+            "Enter your name: "
+        ).strip()
+
+        if not username:
+            username = "Sir"
+
+        save_username(username)
+
+    wish_me(username)
+
+    speak(
+        f"You can tell me 'exit' anytime to shut me down, "
+        f"{username}."
+    )
+
+    running = True
+
+    while running:
+        try:
+            query = take_command()
+
+            if not query:
+                continue
+
+            running, username = handle_command(
+                query,
+                username
+            )
+
+        except KeyboardInterrupt:
+            print("\nVIPRA stopped by user.")
+            break
+
+        except Exception as error:
+            print(f"Unexpected error: {error}")
+            speak(
+                "Something went wrong, "
+                "but I am still running."
+            )
+
+
+# PROGRAM ENTRY POINT
+
+if __name__ == "__main__":
+    main()
